@@ -5,6 +5,7 @@
           name               = []    :: string(),
           has_been_fixed     = false :: yes | no | partially,
           has_c_src          = false :: boolean(),
+          broken_dialyzer    = false :: boolean(),
           upgrades_required          :: string(),
           files_with_PULSE   = false :: boolean(),
           files_with_EQC     = false :: boolean(),
@@ -37,11 +38,12 @@ walk([H | T], DepsDir, Acc) ->
     A  = has_rebar3_branch(#dependency{name = H}),
     {ok, Files} = file:list_dir(filename:join([DepsDir, H])),
     A2 = has_c_src(Files, A),
-    A3 = upgrade_required(A2),
-    A4 = files_with_PULSE(A3),
-    A5 = files_with_EQC(A4),
-    A6 = get_cloc(A5),
-    walk(T, DepsDir, [A6 | Acc]).
+    A3 = has_dialyzer_warnings(Files, A2),
+    A4 = upgrade_required(A3),
+    A5 = files_with_PULSE(A4),
+    A6 = files_with_EQC(A5),
+    A7 = get_cloc(A6),
+    walk(T, DepsDir, [A7 | Acc]).
 
 print(X) ->
     Fields = record_info(fields, dependency),
@@ -114,6 +116,12 @@ has_rebar3([_H | T])                      -> has_rebar3(T).
 clean_up(String) ->
     Branches = string:tokens(String, " "),
     _Branches2 = [string:strip(string:strip(X), both, $\n) || X <- Branches].
+
+-define(D, "dialyzer.ignore-warnings").
+
+has_dialyzer_warnings([],        Acc) -> Acc;
+has_dialyzer_warnings([?D | _T], Acc) -> Acc#dependency{broken_dialyzer = true};
+has_dialyzer_warnings([_H | T],  Acc) -> has_dialyzer_warnings(T, Acc). 
         
 has_c_src([],             Acc) -> Acc;
 has_c_src(["c_src" | _T], Acc) -> Acc#dependency{has_c_src = true};
